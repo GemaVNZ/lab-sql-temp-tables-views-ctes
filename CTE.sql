@@ -15,15 +15,16 @@ SELECT
 FROM customer AS c
 JOIN rental AS r ON c.customer_id = r.customer_id
 GROUP BY c.customer_id 
+ORDER BY rental_count DESC;
 
 -- Paso 2: Crear una tabla temporal
 -- A continuación, cree una tabla temporal que calcule el importe total pagado por cada cliente (total_paid). La tabla temporal debe utilizar 
 -- la vista de resumen de alquiler creada en el paso 1 para unirse con la tabla de pagos y calcular el importe total pagado por cada cliente.
 
-CREATE TEMPORARY TABLE customer_payment_summary_temp AS (
+CREATE TEMPORARY TABLE customer_payment_summary AS (
 SELECT 
         crs.customer_id,  
-        SUM(amount) AS total_paid
+        SUM(p.amount) AS total_paid
 FROM customer_rental_summary AS crs
 JOIN rental AS r ON crs.customer_id = r.customer_id
 JOIN payment AS p ON r.rental_id = p.rental_id
@@ -39,19 +40,22 @@ GROUP BY crs.customer_id
 --derivada de total_paid y rental_count
 
 CREATE VIEW customer_summary AS
-WITH customer_sumary_report AS (
+WITH customer_summary_report AS (
     SELECT 
-            crs.customer_name,
-            crs.email,
-            crs.rental_count,
-            cps.total_paid,
-FROM customer_rental_summary AS crs
-JOIN customer_payment_summary AS cps ON crs.customer_id = cps.customer_id
+        crs.customer_name,
+        crs.email,
+        crs.rental_count,
+        cps.total_paid
+    FROM 
+        customer_rental_summary AS crs
+    JOIN 
+        customer_payment_summary AS cps ON crs.customer_id = cps.customer_id
 )
+
 SELECT 
         customer_name,
         email,
         rental_count,
         total_paid,
         total_paid / rental_count AS average_payment_per_rental
-FROM customer_sumary_report; 
+FROM customer_summary_report; 
