@@ -6,21 +6,30 @@
 -- En primer lugar, cree una vista que resuma la información de alquiler de cada cliente. La vista debe incluir el ID del cliente, el nombre, 
 --la dirección de correo electrónico y la cantidad total de alquileres (rental_count).
 
-CREATE VIEW payment_summary AS
-SELECT customer_id, first_name, email, COUNT(*) AS rental_count
-FROM customer
-JOIN rental ON customer.customer_id = rental.customer_id
-GROUP BY customer_id, first_name, email;
+CREATE VIEW customer_rental_summary AS
+SELECT 
+        customer_id, 
+        CONCAT (c.first_name, ' ', c.last_name) AS customer_name,
+        email, 
+        COUNT(*) AS rental_count
+FROM customer AS c
+JOIN rental AS r ON c.customer_id = r.customer_id
+GROUP BY c.customer_id 
 
 -- Paso 2: Crear una tabla temporal
 -- A continuación, cree una tabla temporal que calcule el importe total pagado por cada cliente (total_paid). La tabla temporal debe utilizar 
 -- la vista de resumen de alquiler creada en el paso 1 para unirse con la tabla de pagos y calcular el importe total pagado por cada cliente.
 
-CREATE TEMPORARY TABLE payment_summary_temp AS
-SELECT customer_id, rental_count, SUM(amount) AS total_paid
-FROM payment_summary
-JOIN payment ON payment.customer_id = payment_summary.customer_id
-GROUP BY customer_id, rental_count;
+CREATE TEMPORARY TABLE customer_payment_summary_temp AS (
+SELECT 
+        crs.customer_id,  
+        SUM(amount) AS total_paid
+FROM customer_rental_summary AS crs
+JOIN rental AS r ON crs.customer_id = r.customer_id
+JOIN payment AS p ON r.rental_id = p.rental_id
+GROUP BY crs.customer_id
+);
+
 
 -- Paso 3: Crear un CTE y el Informe de resumen del cliente
 -- Cree un CTE que una la Vista de resumen de alquiler con la Tabla temporal de resumen de pago del cliente creada en el Paso 2. 
@@ -30,13 +39,19 @@ GROUP BY customer_id, rental_count;
 --derivada de total_paid y rental_count
 
 CREATE VIEW customer_summary AS
-WITH rental_payment_summary AS (
-    SELECT ps.customer_id, ps.first_name, ps.email, ps.rental_count, 
-    SUM(p.amount) AS total_paid
-    FROM payment_summary ps
-    JOIN payment p ON ps.customer_id = p.customer_id
-    GROUP BY ps.customer_id, ps.first_name, ps.email, ps.rental_count
+WITH customer_sumary_report AS (
+    SELECT 
+            crs.customer_name,
+            crs.email,
+            crs.rental_count,
+            cps.total_paid,
+FROM customer_rental_summary AS crs
+JOIN customer_payment_summary AS cps ON crs.customer_id = cps.customer_id
 )
-SELECT customer_id, first_name, email, rental_count, total_paid, 
-       ROUND(total_paid / rental_count, 2) AS average_payment_per_rental
-FROM rental_payment_summary;
+SELECT 
+        customer_name,
+        email,
+        rental_count,
+        total_paid,
+        total_paid / rental_count AS average_payment_per_rental
+FROM customer_sumary_report; 
